@@ -1,18 +1,19 @@
-
 from interactive_trader.ibkr_app import ibkr_app
 import threading
 import time
 from datetime import datetime
+from ibapi.contract import Contract
+import pandas as pd
 
 # If you want different default values, configure it here.
 default_hostname = '127.0.0.1'
 default_port = 7497
-default_client_id = 10645 # can set and use your Master Client ID
+default_client_id = 10645  # can set and use your Master Client ID
 timeout_sec = 5
+
 
 def fetch_managed_accounts(hostname=default_hostname, port=default_port,
                            client_id=default_client_id):
-
     app = ibkr_app()
     app.connect(hostname, int(port), int(client_id))
 
@@ -36,6 +37,7 @@ def fetch_managed_accounts(hostname=default_hostname, port=default_port,
         time.sleep(0.01)
     app.disconnect()
     return app.managed_accounts
+
 
 def fetch_current_time(hostname=default_hostname,
                        port=default_port, client_id=default_client_id):
@@ -102,6 +104,7 @@ def fetch_historical_data(contract, endDateTime='', durationStr='30 D',
 
     def run_loop():
         app.run()
+
     api_thread = threading.Thread(target=run_loop, daemon=True)
     api_thread.start()
     start_time = datetime.now()
@@ -130,6 +133,7 @@ def fetch_historical_data(contract, endDateTime='', durationStr='30 D',
             )
     app.disconnect()
     return app.historical_data
+
 
 def fetch_contract_details(contract, hostname=default_hostname,
                            port=default_port, client_id=default_client_id):
@@ -180,6 +184,7 @@ def fetch_contract_details(contract, hostname=default_hostname,
 
     return app.contract_details
 
+
 def fetch_matching_symbols(pattern, hostname=default_hostname,
                            port=default_port, client_id=default_client_id):
     app = ibkr_app()
@@ -229,9 +234,9 @@ def fetch_matching_symbols(pattern, hostname=default_hostname,
 
     return app.matching_symbols
 
-def place_order(contract, order, hostname=default_hostname,
-                           port=default_port, client_id=default_client_id):
 
+def place_order(contract, order, hostname=default_hostname,
+                port=default_port, client_id=default_client_id):
     app = ibkr_app()
     app.connect(hostname, port, client_id)
     while not app.isConnected():
@@ -253,4 +258,17 @@ def place_order(contract, order, hostname=default_hostname,
     app.disconnect()
 
     return app.order_status
+
+
+def data_pull(ticker):
+    contract = Contract()
+    contract.symbol = ticker
+    contract.secType = 'CASH'
+    contract.exchange = 'SMART'
+    contract.currency = 'USD'
+
+    data = fetch_historical_data(contract)
+    df = pd.DataFrame(data)[['date', 'open', 'high', 'low', 'close']]
+
+    return df
 

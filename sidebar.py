@@ -41,6 +41,7 @@ sidebar = html.Div(
                 ),
                 dbc.NavLink("Blotter", href="/blotter", id="blotter-link"),
                 dbc.NavLink("Errors", href="/errors", id="errors-link"),
+                dbc.NavLink("Pair Blotter", href="/pairBlotter", id="pair-blotter-link")
             ],
             vertical=True,
             pills=True

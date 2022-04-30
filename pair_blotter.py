@@ -10,7 +10,7 @@ blotter = pd.DataFrame(
 order_page = dash_table.DataTable(
     columns=[{"name": i, "id": i} for i in blotter.columns],
     data=blotter.to_dict('records'),
-    id='pair-blotter'
+    id='pair-blotter-link'
 )
 
 

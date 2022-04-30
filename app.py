@@ -16,6 +16,7 @@ from ibapi.order import Order
 import time
 import threading
 import pandas as pd
+import numpy as np
 
 CONTENT_STYLE = {
     "transition": "margin-left .5s",
@@ -49,12 +50,61 @@ app.layout = html.Div(
         sidebar,
         html.Div(id="page-content", style=CONTENT_STYLE),
         dcc.Interval(
-            id = 'ibkr-update-interval',
+            id='ibkr-update-interval',
             interval=5000,
             n_intervals=0
         )
     ],
 )
+
+
+######## PAIR TRADING #######
+@app.callback(
+    [
+        Output('pair-blotter', 'data'), Output('pair-blotter', 'columns')
+    ],
+    [
+        Input('pair_trade_button', 'n_clicks'),
+        State('threshold', 'value'),
+        State('hedge_ratio', 'value'),
+        State('alpha', 'value'),
+        State('window', 'value'),
+    ],
+    prevent_initial_call=True
+)
+def execute_pair_trading(n_clicks, threshold, hedge_ratio, alpha,window):
+    # pull data first
+    df_mar = data_pull("MAR")
+    df_hil = data_pull("HLT")
+    df_pair = pd.merge(df_mar, df_hil, on='date')
+    df_pair.columns = ['date', 'mar_open', 'mar_high','mar_low','mar_close','hlt_open', 'hlt_high','hlt_low','hlt_close']
+    df_pair['date'] = pd.to_datetime(df_pair['date'])
+    df_pair['spread'] = np.log(df_pair['mar_close']/df_pair['hlt_close']**hedge_ratio)
+    window_size = int(window)
+    # calculate std and long term mean
+    std_spread = pd.Series(df_pair['spread'][1:]).rolling(window_size).std(ddof=1)
+    std_spread = np.asarray(std_spread[window_size - 1:-1])
+    lt_mean_spread = pd.Series(df_pair['spread']).rolling(window_size).mean()
+    lt_mean_spread = np.asarray(lt_mean_spread[window_size - 1:-1])
+    # entry signals
+    low = lt_mean_spread - threshold * std_spread
+    go_down = df_pair['spread'][:len(lt_mean_spread)] < low
+    high = lt_mean_spread + threshold * std_spread
+    go_up = df_pair['spread'][:len(lt_mean_spread)] > high
+    df_pair['Low'] = go_down
+    df_pair['High'] = go_up
+    df_pair = df_pair.reset_index()  # make sure indexes pair with number of rows
+
+    blotter = pd.DataFrame()
+    for index, row in df_pair.iterrows():
+        if row["Low"]:
+            blotter.loc[len(blotter.index)] = [row["date"], 'Open', 'BUY', 'MAR', 1, row["mar_Open"], 'FILLED']
+            blotter.loc[len(blotter.index)] = [row["Date"], 'Open', 'SELL', 'HIT', 1, row["hlt_Open"], 'FILLED']
+        elif row["High"]:
+            blotter.loc[len(blotter.index)] = [row["Date"], 'Open', 'SELL', 'MAR', 1, row["mar_Open"], 'FILLED']
+            blotter.loc[len(blotter.index)] = [row["Date"], 'Open', 'BUY', 'HIT', 1, row["hlt_Open"], 'FILLED']
+
+    return blotter.to_dict('records'), [{"name": i, "id": i} for i in blotter.columns]
 
 @app.callback(
     [Output('trade-blotter', 'data'), Output('trade-blotter', 'columns')],
@@ -71,6 +121,7 @@ def update_order_status(n_intervals):
     dt_columns = [{"name": i, "id": i} for i in df.columns]
     return dt_data, dt_columns
 
+
 @app.callback(
     [Output('errors-dt', 'data'), Output('errors-dt', 'columns')],
     Input('ibkr-update-interval', 'n_intervals')
@@ -85,6 +136,7 @@ def update_order_status(n_intervals):
     dt_data = df.to_dict('records')
     dt_columns = [{"name": i, "id": i} for i in df.columns]
     return dt_data, dt_columns
+
 
 @app.callback(
     [
@@ -114,6 +166,7 @@ def toggle_sidebar(n, nclick):
         cur_nclick = 'SHOW'
 
     return sidebar_style, content_style, cur_nclick
+
 
 # this callback uses the current pathname to set the active state of the
 # corresponding nav link to true, allowing users to tell see page they are on
@@ -145,6 +198,7 @@ def render_page_content(pathname):
         ]
     )
 
+
 @app.callback(
     Output('ibkr-async-conn-status', 'children'),
     [
@@ -155,7 +209,6 @@ def render_page_content(pathname):
     ]
 )
 def async_handler(async_status, master_client_id, port, hostname):
-
     if async_status == "CONNECTED":
         raise PreventUpdate
         pass
@@ -196,6 +249,7 @@ def async_handler(async_status, master_client_id, port, hostname):
 
     return str(connected)
 
+
 @app.callback(
     Output('placeholder-div', 'children'),
     [
@@ -211,13 +265,12 @@ def async_handler(async_status, master_client_id, port, hostname):
         Input('order-lmt-price', 'value'),
         Input('order-account', 'value')
     ],
-    prevent_initial_call = True
+    prevent_initial_call=True
 )
 def place_order(n_clicks, contract_symbol, contract_sec_type,
                 contract_currency, contract_exchange,
                 contract_primary_exchange, order_action, order_type,
                 order_size, order_lmt_price, order_account):
-
     # Contract object: STOCK
     contract = Contract()
     contract.symbol = contract_symbol
@@ -248,6 +301,7 @@ def place_order(n_clicks, contract_symbol, contract_sec_type,
     )
 
     return ''
+
 
 if __name__ == "__main__":
     app.run_server()
