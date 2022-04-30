@@ -12,5 +12,8 @@ page_1 = html.Div(
         dbc.Input(id="hedge_ratio", type="number", value=1),
         dbc.Label('Alpha'),
         dbc.Input(id="alpha", type="number", value=1),
+        html.Hr(),
+        html.Button('Start Pair Trading', id='pair-trade-button', n_clicks=0),
+        html.Hr(),
     ]
 )
