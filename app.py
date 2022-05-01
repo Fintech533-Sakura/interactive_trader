@@ -41,7 +41,7 @@ connected = ""
 ibkr_async_conn = ibkr_app()
 
 app = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
-
+server = app.server
 app.layout = html.Div(
     [
         dcc.Store(id='side_click'),
